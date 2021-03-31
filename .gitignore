@@ -1,0 +1,13 @@
+__pycache__
+pointnet2/__pycache__
+pointnet2/build
+pointnet2/dist
+pointnet2/pointnet2.egg-info
+datasets
+venv
+experiment
+.idea
+dataset_kitti_ft.py
+dataset_kitti_ft_self.py
+loss_self.py
+train_self.py

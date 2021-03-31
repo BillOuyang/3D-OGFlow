@@ -1,0 +1,6 @@
+PyQt5==5.13.0
+torch==1.6.0
+pytorch-lightning==1.1.0
+tqdm
+numpy
+tensorboard
