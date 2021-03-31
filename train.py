@@ -165,7 +165,7 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
     # file backup
     os.system('cp %s %s' % ('model_selfocc.py', log_dir))
     os.system('cp %s %s' % ('pointconv_selfocc_util.py', log_dir))
-    os.system('cp %s %s' % ('train_selfocc.py', log_dir))
+    os.system('cp %s %s' % ('train.py', log_dir))
 
     # create model
     blue = lambda x: '\033[94m' + x + '\033[0m'
