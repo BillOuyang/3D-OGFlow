@@ -48,7 +48,7 @@ $ python train_self_ln.py --num_points 8192 --batch_size 3 --epochs 150 --use_mu
 ```
 for the help on how to use the optional arguments, type:
 ```bash
-$ python train.py --help
+$ python train_self_ln.py --help
 ```
 Notice that in order to speed up the running time and to have a better utilization of the GPUs, our self-supervised training code is implemented using the [PyTorch Lightning](https://www.pytorchlightning.ai/) library.
 
