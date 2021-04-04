@@ -404,7 +404,7 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
 
 if __name__ =="__main__":
     # Args
-    parser = argparse.ArgumentParser(description='train pointpwoc.')
+    parser = argparse.ArgumentParser(description='train 3D-OGFlow.')
     parser.add_argument('--num_points', type=int, default=8192, help='number of point in the input point clouds')
     parser.add_argument('--batch_size', type=int, default=3, help='batch size number for each of the GPU')
     parser.add_argument('--epochs', type=int, default=150, help='number of training epochs')
