@@ -8,11 +8,8 @@ from collections import OrderedDict
 
 
 from model_selfocc import PointConvSceneFlowPWC8192selfglobalPointConv as PointConvSceneFlow
-# from model_selfocc import multiScaleLoss
-# from loss_self import self_multiScaleLoss
 from pointconv_selfocc_util import index_points_gather as index_points, index_points_group, Conv1d, knn_point, square_distance
 
-# from torch.utils.tensorboard import SummaryWriter
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -51,30 +48,15 @@ class ClippedStepLR(optim.lr_scheduler._LRScheduler):
 
 
 
-class ln_3dogflow(pl.LightningModule):
-    def __init__(self, num_points, batch_size=3, learning_rate=0.001):
+class ln_ogsfnet(pl.LightningModule):
+    def __init__(self, len_train_loader, len_val_loader,batch_size=3, learning_rate=0.001):
         super().__init__()
         self.save_hyperparameters()
         self.model = PointConvSceneFlow()
 
-        # self.len_train_loader = len_train_loader
-        # self.len_val_loader = len_val_loader
+        self.len_train_loader = len_train_loader
+        self.len_val_loader = len_val_loader
         self.batch_size = batch_size
-        self.num_points = num_points
-
-
-        # self.total_flow_loss = 0
-        # self.total_chamfer_loss = 0
-        # self.total_reg_loss = 0
-        # self.total_occ_loss = 0
-        # self.total_flow_loss_self = 0
-        #
-        # self.occ_sum = 0
-        # self.occ_total_loss = 0
-        # self.epe_full=0
-        # self.epe=0
-
-
 
 
     def forward(self, pos1, pos2, norm1, norm2):
@@ -85,7 +67,6 @@ class ln_3dogflow(pl.LightningModule):
         lr = self.hparams.learning_rate
         optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-08,
                                      weight_decay=0.0001)
-        # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.6)
 
         optimizer.param_groups[0]['initial_lr'] = lr
         MIN_LR = 0.00001
@@ -93,8 +74,6 @@ class ln_3dogflow(pl.LightningModule):
         GAMMA_LR = 0.83
         scheduler = ClippedStepLR(optimizer, STEP_SIZE_LR, MIN_LR, GAMMA_LR)
 
-
-        # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 30, 45, 85, 95, 115], gamma=0.5)
         return [optimizer], [scheduler]
 
     def multiScaleLoss(self, pred_flows, gt_flow, pred_occ_masks, gt_occ_masks, fps_idxs, alpha=[0.02, 0.04, 0.08, 0.16]):
@@ -165,9 +144,6 @@ class ln_3dogflow(pl.LightningModule):
         occ_fw_sum = (mask_fw.sum(dim=1, keepdim=True)) / sq_dst.shape[1]
         occ_bw_sum = (mask_bw.sum(dim=1, keepdim=True)) / sq_dst.shape[1]
 
-        # if epochs <= 20:
-        #     return dst1, dst2
-        # else:
         return mask_fw * dst1 / occ_fw_sum, mask_bw * dst2 / occ_bw_sum
 
 
@@ -186,6 +162,20 @@ class ln_3dogflow(pl.LightningModule):
         return mask_fw * reg_loss, (1.0 - mask_fw) * reg_loss
 
 
+    def pairwise_dst_regularization(self, xyz, flow, nsample=9):
+        xyz_warp = (xyz + flow).permute(0, 2, 1)
+        xyz = xyz.permute(0, 2, 1)
+
+        sq_dst = square_distance(xyz, xyz)
+        knn_idx = torch.topk(sq_dst, 2, dim=-1, largest=False, sorted=False)[1]
+
+        xyz_group_dst = index_points_group(xyz, knn_idx)  ## b,n,k,3
+        xyz_warp_group_dst = index_points_group(xyz_warp, knn_idx)
+
+        xyz_rel_dst = (xyz_group_dst - xyz.unsqueeze(dim=2)).sum(dim=2) ## b,n,3
+        xyz_warp_rel_dst = (xyz_warp_group_dst - xyz_warp.unsqueeze(dim=2)).sum(dim=2) ## b,n,3
+
+        return ((xyz_rel_dst.norm(dim=2) - xyz_warp_rel_dst.norm(dim=2))**2)
 
 
 
@@ -224,9 +214,7 @@ class ln_3dogflow(pl.LightningModule):
             pred_occ = pred_masks_self[i]
             gt_occ = gt_masks_self[i]
 
-            ## chamfer dst
-            # sq_dst = square_distance(src_warp.permute(0, 2, 1), tg.permute(0, 2, 1))
-
+            ## Non-occluded chamfer dst
             dst1, dst2 = self.occ_chamfer(src_warp, tg, occ_fw, occ_bw, epochs)
             chamfer_loss = alpha[i] * (dst1.sum(dim=1).mean() + dst2.sum(dim=1).mean())
 
@@ -235,32 +223,28 @@ class ln_3dogflow(pl.LightningModule):
             reg_loss = alpha[i] * (reg_factor * reg_noc + 3.0 * reg_occ).sum(dim=1).mean()
 
 
+            ## cyclic loss
+            cyclic_loss = 1.0* alpha[i] * self.pairwise_dst_regularization(src, flow, nsample=num_neigbor[i]).sum(dim=1).mean()
+
 
             ## occ loss self-supervision
             diff_mask = pred_occ.permute(0, 2, 1) - gt_occ
             occ_loss = alpha[i] * torch.norm(diff_mask, dim=2).sum(dim=1).mean()
 
-            # bnloss = nn.BCELoss(reduction='none')
-            # occ_loss = bnloss(pred_occ.permute(0, 2, 1),gt_occ).sum(dim=1).mean()
-
             ## flow loss self-supervison
             diff_flow = pred_flows_self[i].permute(0, 2, 1) - gt_flows_self[i]
-            # flow_loss = 0.3*alpha[i]*torch.norm(diff_flow, dim=2).sum(dim=1).mean()
             if epochs <= 30:
                 flow_loss = 0.6 * alpha[i] * (torch.norm(diff_flow, dim=2).sum(dim=1).mean() + torch.norm(diff_flow * gt_occ, dim=2).sum(dim=1).mean())
             else:
                 flow_loss = alpha[i] * torch.norm(diff_flow * (1.0 - gt_occ), dim=2).sum(dim=1).mean()
 
-            # flow_loss = alpha[i] * (torch.norm(diff_flow * (1.0-gt_occ), dim=2).sum(dim=1).mean())
-
-
             chamfer_loss_tot += chamfer_loss
             reg_loss_tot += reg_loss
-            # cyc_loss_tot += cyclic_loss
+            cyc_loss_tot += cyclic_loss
             occ_loss_tot += occ_loss
             flow_loss_tot += flow_loss
 
-        return chamfer_loss_tot, reg_loss_tot, occ_loss_tot, flow_loss_tot
+        return chamfer_loss_tot, reg_loss_tot, occ_loss_tot, flow_loss_tot, cyc_loss_tot
 
 
 
@@ -280,7 +264,7 @@ class ln_3dogflow(pl.LightningModule):
         pred_flows_bw, pred_masks_bw, _, _, pcs2, _ = self(pos2, pos1, norm2, norm1)
         pred_flows_self, pred_masks_self, fps_idxs_self, _, _, _ = self(pos1, pos2_self, norm1, norm2_self)
 
-        chamferloss, regloss, occloss, flowloss_self = self.self_multiScaleLoss(pred_flows, pred_masks_fw,
+        chamferloss, regloss, occloss, flowloss_self, pw_loss_tot = self.self_multiScaleLoss(pred_flows, pred_masks_fw,
                                                                            pred_flows_bw, pred_masks_bw,
                                                                            pred_flows_self, pred_masks_self,
                                                                            flow_self, mask1_self, pcs1,
@@ -291,8 +275,10 @@ class ln_3dogflow(pl.LightningModule):
 
         self.log("train_flow_loss", flow_loss, on_step=False, on_epoch=True, sync_dist=True)
         self.log("train_regloss", regloss, on_step=False, on_epoch=True, sync_dist=True)
-        # self.log("train_pw_loss_tot", pw_loss_tot, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("train_pw_loss_tot", pw_loss_tot, on_step=False, on_epoch=True, sync_dist=True)
         self.log("train_chamfer", chamferloss, on_step=False, on_epoch=True, sync_dist=True)
+        # self.log("reg_factor", reg_factor, on_step=False, on_epoch=True, sync_dist=True)
+
 
         if epochs <=30:
             loss = chamferloss + regloss + occloss + flowloss_self
@@ -339,7 +325,7 @@ class ln_3dogflow(pl.LightningModule):
 
 
     def val_dataloader(self):
-        val_dataset = SceneflowDataset(npoints=self.num_points, train=False, cache=None)
+        val_dataset = SceneflowDataset(npoints=8192, train=False, cache=None)
         val_loader = torch.utils.data.DataLoader(val_dataset,
                                                  batch_size=self.hparams.batch_size,
                                                  num_workers=20,
@@ -352,9 +338,8 @@ class ln_3dogflow(pl.LightningModule):
 def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
 
     learning_rate = 0.001
-    model_name = '3DOGFlow_self'
-    if use_multi_gpu is False:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    model_name = '3DOGFlow'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
 
     # create check point file path
     experiment_dir = Path('./experiment/')
@@ -368,15 +353,30 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
     weight_dir.mkdir(exist_ok=True)
     log_dir = file_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
-
-    logger = TensorBoardLogger(os.path.join(file_dir, 'tb_logs'), name='ogsf_self')
-    # print('tensorboard --logdir=./' + os.path.join(file_dir, 'tb_logs'))
+    logger = TensorBoardLogger(os.path.join(file_dir, 'tb_logs'), name='3DOGFlow_self')
 
     # file backup
     os.system('cp %s %s' % ('model_selfocc.py', log_dir))
     os.system('cp %s %s' % ('loss_self.py', log_dir))
     os.system('cp %s %s' % ('train_self_ln.py', log_dir))
 
+    # F3D dataloader
+    train_dataset = SceneflowDataset_self(npoints=num_points, train=True, cache=None)
+    train_loader = torch.utils.data.DataLoader(train_dataset,
+                                               batch_size=batch_size,
+                                               num_workers=20,
+                                               shuffle=True,
+                                               pin_memory=True,
+                                               drop_last=True)
+    print('train:', len(train_dataset), '/', len(train_loader))
+
+    val_dataset = SceneflowDataset(npoints=num_points, train=False, cache=None)
+    val_loader = torch.utils.data.DataLoader(val_dataset,
+                                             batch_size=batch_size,
+                                             num_workers=20,
+                                             pin_memory=True,
+                                             drop_last=True)
+    print('test:', len(val_dataset), '/', len(val_loader))
 
     ## ln train
     lr_monitor = LearningRateMonitor(logging_interval='step')
@@ -386,7 +386,7 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
                                           save_top_k=5
                                           )
 
-    model = ln_3dogflow(num_points=num_points, batch_size=batch_size,learning_rate=learning_rate)
+    model = ln_ogsfnet(len_train_loader=len(train_loader), len_val_loader=len(val_loader),batch_size=batch_size,learning_rate=learning_rate)
 
     if pretrain is not None:
         model.model.load_state_dict(torch.load(pretrain))
@@ -395,7 +395,7 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
     trainer = pl.Trainer(reload_dataloaders_every_epoch=True, gpus=2, max_epochs=epochs, accelerator="ddp", logger=logger, callbacks=[lr_monitor, checkpoint_callback])
     trainer.fit(model)
 
-    # Save best weight at the end of the training
+    # Save best weight
     best_weight_path = checkpoint_callback.best_model_path
     model = model.load_from_checkpoint(best_weight_path)
     torch.save(model.model.state_dict(), '%s/%s_EPE:%.4f.pth' % (weight_dir, '3DOGFlow_self',checkpoint_callback.best_model_score))
@@ -404,9 +404,9 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
 
 if __name__ =="__main__":
     # Args
-    parser = argparse.ArgumentParser(description='train 3D-OGFlow.')
-    parser.add_argument('--num_points', type=int, default=8192, help='number of point in the input point clouds')
-    parser.add_argument('--batch_size', type=int, default=3, help='batch size number for each of the GPU')
+    parser = argparse.ArgumentParser(description='self-supervised training for 3DOGFlow.')
+    parser.add_argument('--num_points', type=int, default=4096, help='number of point in the input point cloud')
+    parser.add_argument('--batch_size', type=int, default=3, help='batch size per GPU for the training')
     parser.add_argument('--epochs', type=int, default=150, help='number of training epochs')
     parser.add_argument('--use_multi_gpu', type=str2bool, default=True, help='whether to use mult-gpu for the training')
     parser.add_argument('--pretrain', type=str,
