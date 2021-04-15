@@ -48,7 +48,7 @@ class ClippedStepLR(optim.lr_scheduler._LRScheduler):
 
 
 
-class ln_ogsfnet(pl.LightningModule):
+class ln_3dogflow(pl.LightningModule):
     def __init__(self, len_train_loader, len_val_loader,batch_size=3, learning_rate=0.001):
         super().__init__()
         self.save_hyperparameters()
@@ -335,11 +335,11 @@ class ln_ogsfnet(pl.LightningModule):
 
 
 
-def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
+def main(num_points, batch_size, epochs, num_gpu, pretrain):
 
     learning_rate = 0.001
     model_name = '3DOGFlow'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
 
     # create check point file path
     experiment_dir = Path('./experiment/')
@@ -361,7 +361,7 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
     os.system('cp %s %s' % ('train_self_ln.py', log_dir))
 
     # F3D dataloader
-    train_dataset = SceneflowDataset_self(npoints=num_points, train=True, cache=None)
+    train_dataset = SceneflowDataset_self(npoints=4096, train=True, cache=None)
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=batch_size,
                                                num_workers=20,
@@ -386,13 +386,13 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
                                           save_top_k=5
                                           )
 
-    model = ln_ogsfnet(len_train_loader=len(train_loader), len_val_loader=len(val_loader),batch_size=batch_size,learning_rate=learning_rate)
+    model = ln_3dogflow(len_train_loader=len(train_loader), len_val_loader=len(val_loader),batch_size=batch_size,learning_rate=learning_rate)
 
     if pretrain is not None:
         model.model.load_state_dict(torch.load(pretrain))
         print("load from pretrained file")
 
-    trainer = pl.Trainer(reload_dataloaders_every_epoch=True, gpus=2, max_epochs=epochs, accelerator="ddp", logger=logger, callbacks=[lr_monitor, checkpoint_callback])
+    trainer = pl.Trainer(reload_dataloaders_every_epoch=True, gpus=num_gpu, max_epochs=epochs, accelerator="ddp", logger=logger, callbacks=[lr_monitor, checkpoint_callback])
     trainer.fit(model)
 
     # Save best weight
@@ -405,12 +405,12 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
 if __name__ =="__main__":
     # Args
     parser = argparse.ArgumentParser(description='self-supervised training for 3DOGFlow.')
-    parser.add_argument('--num_points', type=int, default=4096, help='number of point in the input point cloud')
+    parser.add_argument('--num_points', type=int, default=8192, help='number of point in the input point cloud')
     parser.add_argument('--batch_size', type=int, default=3, help='batch size per GPU for the training')
     parser.add_argument('--epochs', type=int, default=150, help='number of training epochs')
-    parser.add_argument('--use_multi_gpu', type=str2bool, default=True, help='whether to use mult-gpu for the training')
+    parser.add_argument('--num_gpu', type=int, default=2, help='number of GPUs used for the training')
     parser.add_argument('--pretrain', type=str,
                         default=None,
                         help='train from pretrained model')
     args = parser.parse_args()
-    main(args.num_points, args.batch_size, args.epochs, args.use_multi_gpu, args.pretrain)
+    main(args.num_points, args.batch_size, args.epochs, args.num_gpu, args.pretrain)

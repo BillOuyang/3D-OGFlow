@@ -44,7 +44,7 @@ $ python train.py --help
 In order to train our model on the Flyingthings3D dataset by using our proposed self-supervised scheme, run the following:
 
 ```bash
-$ python train_self_ln.py --num_points 8192 --batch_size 3 --epochs 150 --use_multi_gpu True
+$ python train_self_ln.py --num_points 8192 --batch_size 3 --epochs 150 --num_gpu 2
 ```
 for the help on how to use the optional arguments, type:
 ```bash

@@ -96,7 +96,7 @@ def eval_one_epoch(model, loader, batchsize):
     return mean_epe_full, mean_epe, mean_eval_loss, occ_total_loss, final_occ_acc
 
 
-def train_one_epoch(model, train_loader,optimizer,occ_factor, batch_size, epochs):
+def train_one_epoch(model, train_loader,optimizer, batch_size, epochs):
     total_flow_loss = 0
     total_occ_loss = 0
     total_seen = 0
@@ -243,15 +243,8 @@ def main(num_points, batch_size, epochs, use_multi_gpu, pretrain):
             param_group['lr'] = lr
         optimizer.zero_grad()
 
-        ## occlusion weight update
-        occ_factor = min(0.4, 0.3+epoch*0.001)
-        if epoch >=50:
-            occ_factor = 0.6
-        if epoch >=75:
-            occ_factor = 0.1
-
         ## training for one epoch
-        final_occ_acc, train_flow_loss, total_occ_loss = train_one_epoch(model, train_loader, optimizer, occ_factor, batch_size, epochs=epoch)
+        final_occ_acc, train_flow_loss, total_occ_loss = train_one_epoch(model, train_loader, optimizer, batch_size, epochs=epoch)
         scheduler.step()
 
 
