@@ -167,12 +167,12 @@ def eval_sceneflow(model, loader):
     return mean_epe3d, mean_epe_occ, acc050, acc010, outlier, final_occ_acc, roc_final,[tp_tot, fp_tot, fn_tot, tn_tot]
 
 
-def main(num_points, dataset, ckp_path):
+def main(num_points, dataset, weight_path):
 
     # args
     # num_points = 4096
     # dataset = 'f3d'
-    # ckp_path = './pretrained_model/PointConv_93.6745_080_0.1919.pth'
+    # weight_path = './pretrained_model/PointConv_93.6745_080_0.1919.pth'
 
     # choose dataset
     if dataset.lower() == 'f3d':
@@ -206,7 +206,7 @@ def main(num_points, dataset, ckp_path):
 
 
     try:
-        model.load_state_dict(torch.load(ckp_path))
+        model.load_state_dict(torch.load(weight_path))
     except:
         raise ValueError('Incorrect file path')
 
@@ -236,6 +236,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='evaluate 3D-OGFlow.')
     parser.add_argument('--num_points', type=int, default=8192, help='number of points in the input point cloud')
     parser.add_argument('--dataset', type=str, default='f3d', help='choose the dataset for the evaluation')
-    parser.add_argument('--weight_path', type=str, default='pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth', help='file path of the pretrained model to evaluate')
+    parser.add_argument('--weight_path', type=str, default='./pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth', help='file path of the pretrained model to evaluate')
     args = parser.parse_args()
-    main(args.num_points, args.dataset, args.ckp_path)
+    main(args.num_points, args.dataset, args.weight_path)
