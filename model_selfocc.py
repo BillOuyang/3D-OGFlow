@@ -212,12 +212,12 @@ def multiScaleLoss(pred_flows, gt_flow, pred_occ_masks, gt_occ_masks, fps_idxs, 
 
         occ_loss += 1.4*alpha[i] *torch.norm(diff_mask, dim=2).sum(dim=1).mean()
 
-        
+
         # two version of flow loss: the first one gives a better accuracy but requires ground truth occ label.
         # The second one does not require occlusion label and the occlusion can be learn in a self-supervised manner.
 
-        # flow_loss += alpha[i] *(torch.norm(diff_flow, dim=2).sum(dim=1).mean() + torch.norm(diff_flow*gt_masks[i + offset], dim=2).sum(dim=1).mean())
-        flow_loss += alpha[i] *torch.norm(diff_flow, dim=2).sum(dim=1).mean()
+        flow_loss += alpha[i] *(torch.norm(diff_flow, dim=2).sum(dim=1).mean() + torch.norm(diff_flow*gt_masks[i + offset], dim=2).sum(dim=1).mean())
+        # flow_loss += alpha[i] *torch.norm(diff_flow, dim=2).sum(dim=1).mean()
 
 
 

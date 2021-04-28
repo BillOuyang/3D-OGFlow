@@ -57,12 +57,12 @@ Notice that in order to speed up the running time and to have a better utilizati
 We provide two pretained weights of 3D-OGFlow, one from the supervised training and the other from the self-supervised training. In order to evaluate our pretrained model under the ```pretrained_model``` folder with the Flyingthings3D dataset, run the following:
 
 ```bash
-$ python evaluate.py --num_points 8192 --dataset f3d --ckp_path ./pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth
+$ python evaluate.py --num_points 8192 --dataset f3d --weight_path ./pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth
 ```
 
 for the evaluation on KITTI dataset, run the following:
 ```bash
-$ python evaluate.py --num_points 8192 --dataset kitti --ckp_path ./pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth
+$ python evaluate.py --num_points 8192 --dataset kitti --weight_path ./pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth
 ```
 For help on how to use this script, type:
 ```bash

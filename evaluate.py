@@ -236,6 +236,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='evaluate 3D-OGFlow.')
     parser.add_argument('--num_points', type=int, default=8192, help='number of points in the input point cloud')
     parser.add_argument('--dataset', type=str, default='f3d', help='choose the dataset for the evaluation')
-    parser.add_argument('--ckp_path', type=str, default='pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth', help='file path of the pretrained model to evaluate')
+    parser.add_argument('--weight_path', type=str, default='pretrained_model/supervised/PointPWOC_88.6285_114_0.1409.pth', help='file path of the pretrained model to evaluate')
     args = parser.parse_args()
     main(args.num_points, args.dataset, args.ckp_path)
