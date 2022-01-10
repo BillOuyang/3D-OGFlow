@@ -1,6 +1,11 @@
 # Occlusion Guided Self-supervised Scene Flow Estimation on 3D Point Clouds
 This is the official implementation for the paper "Occlusion Guided Self-supervised Scene Flow Estimation on 3D Point Clouds"
 
+## Citation
+If you find our work useful in your research, please cite:
+
+        @INPROCEEDINGS{9665872,  author={Ouyang, Bojun and Raviv, Dan},  booktitle={2021 International Conference on 3D Vision (3DV)},   title={Occlusion Guided Self-supervised Scene Flow Estimation on 3D Point Clouds},   year={2021},  volume={},  number={},  pages={782-791},  doi={10.1109/3DV53792.2021.00087}}
+
 ## Requirement
 To run our model (3D-OGFlow), please install the following package (we suggest to use the Anaconda environment):
 * Python 3.6+
